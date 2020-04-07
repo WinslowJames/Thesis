@@ -1,0 +1,66 @@
+---
+title: "Winslow_Thesis_Functions"
+author: "James Winslow"
+date: "3/12/2020"
+output: html_document
+---
+
+```{r Function_Import_Data}
+import_data <- function(x){
+  if (x == "local"){
+    thesis_data <- read.csv("~/THESIS/Data/ForRwithGender.csv",sep=",",header=TRUE)
+  } else {
+  thesis_data <- read.csv("//data.ucdenver.pvt/dept/SOM/ACCORDS/Projects/JRice_group/Winslow/Data/ForRwithGender.csv",sep=",",header=TRUE)  
+  }
+}
+
+
+```
+```{r Clean_Data}
+# # requires: 
+# library(dplyr)
+# library(reshape)
+# # 
+
+# Reshape the data to get one row per person and 
+# one column : count of events (infections)
+# one column : for each covariate 
+# one column : for the maximum number of days to be the time variable
+# one column : for the indicator of death 
+
+clean_data <- function(thesis_data){ 
+# rewrite more consisely #
+# here we are just removing the variables irrelevant to reshaping the data #
+change_data_one <- thesis_data[,-c(1, 3:9)]
+print(head(change_data_one))
+
+# change the data into the desired form #
+melt_thesis <- melt(change_data_one, id = c("MRN","start"))
+summary(melt_thesis$variable)
+cast_thesis <<- cast(melt_thesis, MRN~variable, sum)
+
+# check to see if it looks right #
+# head(cast_thesis)
+ 
+# check to see the max number of events #
+# max(cast_thesis$event)
+
+# table(cast_thesis$event)
+
+# write this chunk below better #
+# we are removing the variables that we just used for the reshed data so that we
+# can merge all of the other variables back in 
+
+
+subset_for_covs <- thesis_data[,c(1:9)]
+colnames(subset_for_covs)
+
+# add max(days) column #
+
+# merge the simple model columns with the covariates #
+# this chunk isn't necesssary for the simple model simulation or likelihood #
+Reshaped <<- merge(x = cast_thesis, y = subset_for_covs, by = "MRN" , all.y = TRUE)
+}
+
+```
+

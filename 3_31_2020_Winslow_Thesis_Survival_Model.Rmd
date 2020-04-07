@@ -1,0 +1,99 @@
+---
+title: "3_31_2020_Winslow_Thesis_Survival_Model"
+author: "James Winslow"
+date: "4/1/2020"
+output: pdf_document
+---
+```{r Import_Data}
+source("Winslow_Functions.R")
+
+# this function creates a global object called thesis_data #
+# make sure this isn't problematic since using '<<-' isn't a great habit #
+
+import_data("local")
+
+```
+
+```{r}
+source("Winslow_Functions.R")
+library(dplyr)
+library(reshape)
+
+# this function creates a global object called Reshaped & cast_thesis #
+# make sure this isn't problematic since using '<<-' isn't a great habit #
+
+clean_data(thesis_data)
+```
+
+```{r}
+
+# make a copy of the data for this next bit #
+simple_model <- cast_thesis
+
+# rename the variables so it's clear what we are using them for in the simple
+# model
+simple_model <- `colnames<-`(simple_model, c("id","time.to.death","n.events","dead"))
+```
+
+
+Since the purpose of the joint-model is to improve on inference that would be gained from either the survival model or the recurrent infections on their own, we want to demonstrate the results of each of those models on their own. 
+\newline
+Here, we present the formulation of a simple survival model using both an exponential and weibull form for the survival distribution. 
+\newline
+\section{Exponential Distribution}
+\subsection{Overview} The exponential distribution is the simplest parametric model for survival time and assumes a constant risk over time. This is analagous with the more succint description of being a 'memoryless' distribution. This distribution is not influenced by the decided upon definition for time zero. 
+\newline
+\subsection{Formulation}
+* pdf: $f(x) = \lambda e^{- \lambda x}$
+* survival function: $S(x)= e^{-\lambda x}$
+* hazard function: $\lambda(x) \equiv h(x) = \lambda , \lambda > 0$
+* cumulative hazard: $\Lambda(x) = \lambda x$
+* Expectation: $E[X] = \frac{1}{ \lambda}$
+* Variance: $V[X] = \frac{1}{ \lambda ^{2}}$
+
+\section{Weibull Distribution}
+\subsection{Overview} The Weibull distribution is a two parameter family that results in the exponential distribution when the second parameter, $\gamma = 1$.
+\subsection{Formulation}
+* We denote $X \sim Weibull(\lambda,\gamma)$
+* pdf: $f(x) = \lambda \gamma x^{ \gamma - 1}e^{- \lambda x^{ \gamma }}$
+* survival function: $S(x) = e^{-\lambda x^{\gamma}}$
+* hazard function: $\lambda(x) \equiv h(x) = \lambda \gamma x^{\gamma - 1}$
+* cumulative hazard: $\Lambda(x) = \lambda x^{\gamma}$
+* Expectation: $E[X] = \lambda^{-\frac{1}{\gamma}}\Gamma(1 + \frac{1}{\gamma})$
+* Variance: $V[X] = \lambda^{-\frac{2}{\gamma}} \Big[ \Gamma(1 + \frac{2}{\gamma}) - \Gamma(1 + \frac{1}{\gamma})^{2}\Big]$
+
+
+
+```{r}
+# now do the survival element #
+# we want to do a simpler model with the hazard being exponential #
+# the survival function takes care of time and death variables #
+# then we just need event distribution #
+# poisson with offset for events #
+  # log(time) of risk is the offset for events #
+# shape of the hazard should match the joint model #
+
+# Load required packages
+library(survival)
+library(survminer)
+library(dplyr)
+
+survival_model <- simple_model
+
+surv_object <- Surv(time = survival_model$t, event = simple_model$dead)
+
+survive_mod_exp <- survreg(Surv(time.to.death,dead) ~ 1, data = survival_model, dist="exponential", x = TRUE)
+
+survive_mod_weibull <- survreg(Surv(time.to.death,dead) ~ 1, data = survival_model, dist="weibull", x = TRUE)
+
+
+summary(survive_mod_exp)
+exponential_survial_results <- tibble(summary(survive_mod_exp))
+exponential_survial_results[[1]]
+
+summary(survive_mod_weibull)
+weibull_survial_results <- tibble(summary(survive_mod_weibull))
+weibull_survial_results[[1]]
+```
+
+
