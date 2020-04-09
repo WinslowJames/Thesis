@@ -1,0 +1,221 @@
+---
+title: "3_31_2020_Winslow_Thesis_Joint_Model"
+author: "James Winslow"
+date: "4/7/2020"
+output: pdf_document
+---
+```{r Import_Data}
+source("Winslow_Functions.R")
+
+# this function creates a global object called thesis_data #
+# make sure this isn't problematic since using '<<-' isn't a great habit #
+
+import_data("local")
+head(thesis_data)
+
+```
+
+```{r}
+source("Winslow_Functions.R")
+library(dplyr)
+library(reshape)
+
+# this function creates a global object called Reshaped & cast_thesis #
+# make sure this isn't problematic since using '<<-' isn't a great habit #
+
+clean_data(thesis_data)
+```
+
+
+```{r}
+# Now, we attempt to code the likelihood function and apply to the data
+# let's look at the data to make sure it's what we think it is #
+# head(cast_thesis)
+
+# make a copy of the data for this next bit #
+simple_model <- cast_thesis
+
+# rename the variables so it's clear what we are using them for in the simple
+# model
+simple_model <- `colnames<-`(simple_model, c("id","time.to.death","n.events","dead"))
+```
+We want to construct a poisson model for the number of infections observed up to a certain time. By imposing an offset, we can interpret the model as a rate instead of a count. This is beneficial to manage the variable start times that subjects may have  
+
+$log(\lambda_{x}) = log(t_{x}) + \beta^{'}_{0} + \beta^{x}_{1}$ \newline
+where $log(t_{x})$ is the offset.
+
+```{r}
+# We have been getting some weird results for the poisson, so we need to look at # what is going on
+MRN_table <- as.data.frame(table(thesis_data$MRN))
+
+table(MRN_table$Freq)
+
+summary(simple_model$n.events)
+```
+
+```{r}
+
+# the model we want to use has a poisson component which will link to the survival model via the fraily (random effect) #
+# this chunk does some diagnostics to see how well event count fits pois dist #
+library(car)
+library(MASS)
+
+pois_model <- simple_model
+
+
+# running poisson model #
+## load lme4 package
+library(lme4)
+
+pois_model$log.time <- log(pois_model$time.to.death)
+pois_model$log.events <- log(pois_model$n.events)
+
+
+fish <- glm(n.events ~ log.time, family = poisson(link = "log"),
+              data  = pois_model)
+
+
+summary(fish)
+```
+
+
+
+```{r}
+# now do the survival element #
+# we want to do a simpler model with the hazard being exponential #
+# the survival function takes care of time and death variables #
+# then we just need event distribution #
+# poisson with offset for events #
+  # log(time) of risk is the offset for events #
+# shape of the hazard should match the joint model #
+
+# Load required packages
+library(survival)
+library(survminer)
+library(dplyr)
+
+survival_model <- simple_model
+
+surv_object <- Surv(time = survival_model$time.to.death, event = simple_model$dead)
+
+survive_mod_exp <- survreg(Surv(time.to.death,dead) ~ 1, data = survival_model, dist="exponential", x = TRUE)
+
+survive_mod_weibull <- survreg(Surv(time.to.death,dead) ~ 1, data = survival_model, dist="weibull", x = TRUE)
+
+
+summary(survive_mod_exp)
+exponential_survial_results <- tibble(summary(survive_mod_exp))
+exponential_survial_results[[1]]
+
+summary(survive_mod_weibull)
+weibull_survial_results <- tibble(summary(survive_mod_weibull))
+weibull_survial_results[[1]]
+```
+
+```{r}
+# Now, we attempt to code the likelihood function and apply to the data
+# looks right #
+# head(simple_model)
+
+# write likelihood function for the simple model #
+
+jointpanel.llik <- function(theta,n.events,time.to.death,dead) {
+
+  h <- n.events
+  t <- time.to.death
+  delta <- dead
+
+
+  lambda <- exp(theta[1])
+  mu <- exp(theta[2])
+  alpha <- exp(theta[3])
+
+
+  sum(lgamma(h+alpha+delta) + alpha*log(alpha) - lfactorial(h) - lgamma(alpha) +
+    delta*log(mu)+h*log(lambda*t) +(-h-alpha-delta)*log(alpha+t*(mu+lambda)))
+
+}
+
+# coefficents for rate function for time to death
+beta0 <- c(-4,0)
+# coefficients for mean count of events (infections)
+alpha0 <- c(-1,0)
+# 1/variance of frailty
+frail.sd <- 2
+omega <- 1/frail.sd^2
+# length of follow-up period
+tau <- 5
+
+n <- 500
+
+trials <- 100
+est <- array(dim=c(trials,3,2,2))
+
+system.time(
+for(tr in 1:trials) {
+	# generates a gammma dist   # 
+	v <- rgamma(n,shape=omega,rate=omega)
+
+	# column of near zeros #
+	lambda <- exp(beta0)*v
+	
+	# column of values # 
+	mu <- exp(alpha0)*v
+
+	deathtime <- rexp(n,lambda)
+	#mean(deathtime>tau)
+
+	obstime <- apply(cbind(tau,deathtime),1,min)
+	died.onstudy <- 1*(deathtime<=tau) 
+	
+	num.infect <- rpois(n,mu*obstime)
+
+	model_one <- optim(rep(0,3), jointpanel.llik, hessian=TRUE, n.events = num.infect, time.to.death = obstime,
+	              dead = died.onstudy,
+		control=list(fnscale=-1,trace=0,maxit=1e3))
+
+	est[tr,,,1] <- cbind(model_one$par,sqrt(diag(solve(-model_one$hessian))))
+}
+)
+
+apply(est[,,1,],2:3,mean)
+c(alpha0,beta0,log(omega))
+
+apply(est[,,1,],2:3,sd)
+apply(est[,,2,],2:3,mean,na.rm=TRUE)
+```
+
+ 
+```{r}
+# give the model starting values for theta
+start.beta <- c(0,0,0)
+
+mod1 <- optim(start.beta, # starting values
+ jointpanel.llik, # function to optimize
+ hessian=TRUE, # so we can get standard errors
+ # arguments to the log-likelihood function
+ n.events = simple_model$n.events ,
+ time.to.death = simple_model$time.to.death ,
+ dead = simple_model$dead , # optimization method (quasi-Newton)
+ control=list(fnscale=-1,trace=0,maxit=1e3) # tells optim() to maximize instead of minimize
+ )
+
+ mod1$par
+
+```
+
+
+```{r}
+# actually do the above chunk with the offset #
+
+sum(survival_model$dead)/sum(survival_model$time.to.death)
+
+#[1] 4.044313e-05
+
+exp(coef(fish))
+
+# So, we multiple by 365 to get deaths per year #
+# Could multiple by 1000 if we want deaths per thousand child-years #
+
+exp(coef(fish))*365*1000
+```
