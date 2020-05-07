@@ -1,0 +1,154 @@
+---
+title: "3_31_2020_Winslow_Thesis_Poisson_Model"
+author: "James Winslow"
+date: "4/1/2020"
+output: pdf_document
+---
+```{r Import_Data}
+source("Winslow_Functions.R")
+
+# this function creates a global object called thesis_data #
+# make sure this isn't problematic since using '<<-' isn't a great habit #
+
+import_data("local")
+```
+
+```{r}
+source("Winslow_Functions.R")
+library(dplyr)
+library(reshape)
+
+# this function creates a global object called Reshaped & cast_thesis #
+# make sure this isn't problematic since using '<<-' isn't a great habit #
+
+clean_data(thesis_data)
+
+```
+
+
+```{r}
+# make a copy of the data for this next bit #
+simple_model <- cast_thesis
+
+# rename the variables so it's clear what we are using them for in the simple
+# model
+simple_model <- `colnames<-`(simple_model, c("id","time.to.death","n.events","dead"))
+simple_model$log.time <- log(simple_model$time.to.death)
+```
+The simplest way to model count data is using the Poisson distribution. The density can be written \\
+\begin{math}
+f(y|\lambda) = \frac{e^{- \lambda}\lambda^{y}}{y!}
+\end{math}
+
+We want to construct a poisson model for the number of infections observed up to a certain time. By imposing an offset, we can interpret the model as a rate instead of a count. This is beneficial to manage the variable start times that subjects may have  
+
+$log(\lambda_{x}) = log(t_{x}) + \beta^{'}_{0} + \beta^{x}_{1}$ \newline
+where $log(t_{x})$ is the offset. \\
+
+In a GLM, the canonical link is written as \\
+\begin{math}
+g(\lambda) = log(\lambda)
+\end{math}
+This describes a log-linear relationship between the linear predictor and the mean (of the outcome). 
+```{r}
+# the model we want to use has a poisson component which will link to the survival model via the fraily (random effect) #
+# this chunk does some diagnostics to see how well event count fits pois dist #
+library(car)
+library(MASS)
+# use offset()
+
+fish <- glm(n.events ~ offset(log.time), family = poisson(link = "log"),
+              data  = simple_model)
+
+summary(fish)
+# Coefficients:
+#             Estimate Std. Error z value Pr(>|z|)    
+# (Intercept) -9.09893    0.02645    -344   <2e-16 ***
+```
+
+Due to the Poisson distirbution being a 1-parameter family, the mean and variance are equal. When this is the case, we say that the data is dispersed with some parameter $\Phi = 1$. If we want to relax the assumption that the mean and variance are equal (which is almost certainly the case) we may employ the Quasi-Poisson distribution which allows $\Phi$ to be estimated from the data. 
+```{r}
+quasi_fish <- glm(n.events ~ offset(log.time), family = quasipoisson(link = "log"),
+              data  = simple_model)
+summary(quasi_fish)
+quasi_fish$coefficients
+# Coefficients:
+#             Estimate Std. Error t value Pr(>|t|)    
+# (Intercept) -9.09893    0.04179  -217.7   <2e-16 ***
+```
+As we can see, the dispersion parameter here is 2.50. This means that the data is over-dispersed. If we were to find out that adding covariates as predictors to the model doesn't help, we might think that the overdispersion is due to heterogeneity. \\
+Also note that the coefficient estimates are equal (this should ALWAYS be the case). The difference is that inference done here would be adjusted for the adjusted standard error(s). \\
+There is no fully specified likelihood for the quasi-Poisson model. 
+```{r}
+time <-seq (0,8154,0.1)  
+
+values <- predict(fish, list(log.time = time))
+
+plot(simple_model$log.time, simple_model$n.events, xlab = "Offset(Days)", ylab = "Events", pch = 16)
+
+lines(time, exp(values), lwd = 2, col = "blue")
+```
+
+We may also model over-dispersed data such as ours using the negative binomial distribution. The negative binomial may arise from a Poisson$(\lambda)$ distribution where the parameter $(\lambda)$ follows a Gamma distribution. 
+```{r}
+# this chunk does some diagnostics to see how well event count fits neg bin dist #
+library(car)
+library(MASS)
+# need to figure out what is happening with the parameterization in R for neg bin
+
+neg_bin_model <- glm.nb(n.events ~ offset(log.time), link = "log", data  = simple_model)
+summary(neg_bin_model)
+```
+
+```{r}
+# Check to see if we want to use coeftest(fish,vcov=sandwich)
+library(lmtest)
+library(sandwich)
+coeftest(fish,vcov=sandwich)
+```
+
+
+Now, we will investigate the impact of including covariate data in our model. We can write the standard log-linear Poisson regression model as \newline
+
+\begin{align*}
+log[E(Y_{i}|X_{i})] &= log(\mu_{i}) \\
+                      &= log(T_{i}) + \beta_{1}X_{1} + \beta_{2}X_{2} + \cdots + \beta_{i}X_{i}
+\end{align*}
+
+
+
+### Count Models With Covariates
+The covariates available are : hospital site(2 versions), gender, race, organ, quarter, year, lt2
+```{r}
+# rename the variables so it's clear what we are adding covariates now
+head(Reshaped)
+cov_model <- `colnames<-`(Reshaped,c("id","time.to.death","n.events","dead","hospital","gender","race","organ","quarter","year","lt2","UngrpHospital"))
+
+head(cov_model)
+cov_model$log.time <- log(cov_model$time.to.death)
+```
+
+```{r}
+# the model we want to use has a poisson component which will link to the survival model via the fraily (random effect) #
+# this chunk does some diagnostics to see how well event count fits pois dist #
+library(car)
+library(MASS)
+# 
+
+covariate_fish <- glm(n.events ~ offset(log.time) + hospital + gender + race + organ + year + lt2, family = poisson(link = "log"),
+              data  = cov_model)
+
+summary(covariate_fish)
+
+```
+
+We may also model over-dispersed data such as ours using the negative binomial distribution. The negative binomial may arise from a Poisson$(\lambda)$ distribution where the parameter $(\lambda)$ follows a Gamma distribution. 
+```{r}
+# this chunk does some diagnostics to see how well event count fits neg bin dist #
+library(car)
+library(MASS)
+# need to figure out what is happening with the parameterization in R for neg bin
+
+cov_neg_bin_model <- glm.nb(n.events ~ offset(log.time) + hospital + gender + race + organ + year + lt2, control = glm.control(maxit=100),link = "log", data  = cov_model)
+summary(cov_neg_bin_model)
+```
