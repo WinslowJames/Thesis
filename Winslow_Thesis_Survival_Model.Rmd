@@ -1,10 +1,12 @@
 ---
-title: "3_31_2020_Winslow_Thesis_Survival_Model"
+title: "Winslow_Thesis_Survival_Model"
 author: "James Winslow"
 date: "4/1/2020"
 output: pdf_document
 ---
 ```{r Import_Data}
+library(dplyr)
+library(reshape)
 source("Winslow_Functions.R")
 
 # this function creates a global object called thesis_data #
@@ -12,30 +14,32 @@ source("Winslow_Functions.R")
 
 import_data("local")
 
-```
-
-```{r}
-source("Winslow_Functions.R")
-library(dplyr)
-library(reshape)
 
 # this function creates a global object called Reshaped & cast_thesis #
 # make sure this isn't problematic since using '<<-' isn't a great habit #
 
 clean_data(thesis_data)
+clean_up(Reshaped)
 ```
+
+
 
 ```{r}
+library(car)
+### Relevel / recode for reference categories #
 
-# make a copy of the data for this next bit #
-simple_model <- cast_thesis
+Reshaped$year <- Reshaped$year - min(Reshaped$year) 
 
-# rename the variables so it's clear what we are using them for in the simple
-# model
-simple_model <- `colnames<-`(simple_model, c("id","time.to.death","n.events","dead"))
+# Make 'Heart' the reference category for organ transplant #
+
+Reshaped$organ <- as.factor(Reshaped$organ)
+Reshaped <- within(Reshaped, organ <- relevel(organ, ref = 'Heart'))
+
+# Combine Race into White, Black, and Other #
+Reshaped$race <- as.factor(Reshaped$race)
+Reshaped <- within(Reshaped, race <- relevel(race, ref = 'White'))
+
 ```
-
-
 Since the purpose of the joint-model is to improve on inference that would be gained from either the survival model or the recurrent infections on their own, we want to demonstrate the results of each of those models on their own. 
 \newline
 Here, we present the formulation of a simple survival model using both an exponential and weibull form for the survival distribution. 
@@ -79,11 +83,8 @@ library(survival)
 library(survminer)
 library(dplyr)
 
-
-survival_model <- simple_model
-
 # First, let's look at the Kaplan Meier #
-KM_fit <- survfit(Surv(time = survival_model$time.to.death, event = survival_model$dead)~1, data = survival_model)
+KM_fit <- survfit(Surv(time = Reshaped$time.to.death, event = Reshaped$dead)~1, data = Reshaped)
 
 summary(KM_fit, times = c(1000, 2000))
 
@@ -96,18 +97,17 @@ plot(KM_fit, xlab = "Time to Death (days)", ylab = "Survival Probability",
 
 ### 
 
-surv_object <- Surv(time = survival_model$time.to.death, event = simple_model$dead)
+surv_object <- Surv(time = Reshaped$time.to.death, event = Reshaped$dead)
 
 
-survive_mod_exp <- survreg(Surv(time.to.death,dead) ~ 1, data = survival_model, dist="exponential", x = TRUE)
+survive_mod_exp <- survreg(Surv(time.to.death,dead) ~ 1, data = Reshaped, dist="exponential", x = TRUE)
 
-survive_mod_weibull <- survreg(Surv(time.to.death,dead) ~ 1, data = survival_model, dist="weibull", x = TRUE)
+survive_mod_weibull <- survreg(Surv(time.to.death,dead) ~ 1, data = Reshaped, dist="weibull", x = TRUE)
 
 
 
 summary(survive_mod_exp)
-exponential_survial_results <- tibble(summary(survive_mod_exp))
-exponential_survial_results[[1]]
+
 
 
 summary(survive_mod_weibull)
@@ -122,6 +122,12 @@ weibull_survial_results[[1,]]
 # Scale = 2.97 
 # Shape = 1/2.97 
 #       = 0.3367003 
+#              Value Std. Error   z      p
+
+
+# when i use curve, make add=true , lower tail = # 
+# don't need CI when superimposing KM with parametric plots 
+# 
 ```
 
 
@@ -147,53 +153,99 @@ The covariates available are : hospital site(2 versions), gender, race, organ, q
 ```{r}
 # rename the variables so it's clear what we are adding covariates now
 head(Reshaped)
-cov_model <- `colnames<-`(Reshaped,c("id","time.to.death","n.events","dead","hospital","gender","race","organ","quarter","year","lt2","UngrpHospital"))
 
-head(cov_model)
-cov_model$log.time <- log(cov_model$time.to.death)
-```
-
-```{r}
-# rename the variables so it's clear what we are adding covariates now
-head(Reshaped)
-cov_model <- `colnames<-`(Reshaped,c("id","time.to.death","n.events","dead","hospital","gender","race","organ","quarter","year","lt2","UngrpHospital"))
-
-head(cov_model)
-cov_model$log.time <- log(cov_model$time.to.death)
+Reshaped$log.time <- log(Reshaped$time.to.death)
 ```
 
 
-```{r}
 
+
+```{r}
+### This chunk includes year and is otherwise identical to the later chunk #
 # Load required packages
 library(rms)
 library(survival)
 library(survminer)
 library(dplyr)
 
-
-### 
-# + hospital + gender + race + organ + year + lt2
-Reshaped <- `colnames<-`(Reshaped,c("id","time.to.death","n.events","dead","hospital","gender","race","organ","quarter","year","lt2","UngrpHospital")) 
+options(scipen = 99)
 
 surv_object <- Surv(time = Reshaped$time.to.death, event = Reshaped$dead)
 
+# remember to remove hospital from the model as a continuous parameter  #
+survive_cov_exp <- survreg(Surv(time.to.death,dead) ~ gender + race + organ + year + lt2 , data = Reshaped, dist="exponential", x = TRUE)
 
-survive_cov_exp <- survreg(Surv(time.to.death,dead) ~ hospital + gender + race + organ + year + lt2 , data = Reshaped, dist="exponential", x = TRUE)
-
-survive_cov_weibull <- survreg(Surv(time.to.death,dead) ~ hospital + gender + race + organ + year + lt2, data = Reshaped, dist="weibull", x = TRUE)
+survive_cov_weibull <- survreg(Surv(time.to.death,dead) ~ gender + race + organ + year + lt2, data = Reshaped, dist="weibull", x = TRUE)
 
 
 
 summary(survive_cov_exp)
-exponential_survial_cov_res <- tibble(summary(survive_cov_exp))
-exponential_survial_cov_res[[1]]
+
 
 
 summary(survive_cov_weibull)
-weibull_survial_cov_res <- tibble(summary(survive_cov_weibull))
-weibull_survial_cov_res[[1,]]
+
+
+# pull off the design matrix x
+# model.matrix or model.frame
+
 
 
 
 ```
+
+```{r}
+
+
+#   survreg's scale  =    1/(rweibull shape)
+#   survreg's intercept = log(rweibull scale)
+# pweibull already takes care of the log-log
+# go back and look at curve function
+# Scale = 2.97 
+# Shape = 1/2.97 
+#       = 0.3367003 
+#              Value Std. Error   z      p
+
+
+# when i use curve, make add=true , lower tail = # 
+# don't need CI when superimposing KM with parametric plots 
+# 
+curve(pweibull(x,shape=1/2.76,scale=2.76),0,80,ylab="Cumulative Proportion")
+curve(1-pweibull(x,shape=1/2.76,scale=2.76),0,80,ylab="Survival Proportion")
+```
+
+```{r}
+### This chunk removed year but is otherwise identical to the earlier chunk #
+# Load required packages
+library(rms)
+library(survival)
+library(survminer)
+library(dplyr)
+
+options(scipen = 99)
+
+
+surv_object <- Surv(time = Reshaped$time.to.death, event = Reshaped$dead)
+
+# remember to remove hospital from the model as a continuous parameter  #
+exp_no_year <- survreg(Surv(time.to.death,dead) ~ gender + race + organ + lt2 , data = Reshaped, dist="exponential", x = TRUE)
+
+weibull_no_year <- survreg(Surv(time.to.death,dead) ~ gender + race + organ + lt2, data = Reshaped, dist="weibull", x = TRUE)
+
+
+
+summary(exp_no_year)
+
+
+
+summary(weibull_no_year)
+
+
+# pull off the design matrix x
+# model.matrix or model.frame
+
+
+
+
+```
+

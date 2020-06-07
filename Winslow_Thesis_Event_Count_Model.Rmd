@@ -1,40 +1,32 @@
 ---
-title: "3_31_2020_Winslow_Thesis_Poisson_Model"
+title: "Winslow_Thesis_Event_Count_Model"
 author: "James Winslow"
-date: "4/1/2020"
+date: "6/7/2020"
 output: pdf_document
 ---
+
 ```{r Import_Data}
+library(dplyr)
+library(reshape)
 source("Winslow_Functions.R")
 
 # this function creates a global object called thesis_data #
 # make sure this isn't problematic since using '<<-' isn't a great habit #
 
 import_data("local")
-```
 
-```{r}
-source("Winslow_Functions.R")
-library(dplyr)
-library(reshape)
 
 # this function creates a global object called Reshaped & cast_thesis #
 # make sure this isn't problematic since using '<<-' isn't a great habit #
 
 clean_data(thesis_data)
-
+clean_up(Reshaped)
+Reshaped$log.time <- log(Reshaped$time.to.death)
 ```
 
 
-```{r}
-# make a copy of the data for this next bit #
-simple_model <- cast_thesis
 
-# rename the variables so it's clear what we are using them for in the simple
-# model
-simple_model <- `colnames<-`(simple_model, c("id","time.to.death","n.events","dead"))
-simple_model$log.time <- log(simple_model$time.to.death)
-```
+
 The simplest way to model count data is using the Poisson distribution. The density can be written \\
 \begin{math}
 f(y|\lambda) = \frac{e^{- \lambda}\lambda^{y}}{y!}
@@ -56,10 +48,8 @@ This describes a log-linear relationship between the linear predictor and the me
 library(car)
 library(MASS)
 # use offset()
-
 fish <- glm(n.events ~ offset(log.time), family = poisson(link = "log"),
-              data  = simple_model)
-
+              data  = Reshaped)
 summary(fish)
 # Coefficients:
 #             Estimate Std. Error z value Pr(>|z|)    
@@ -69,7 +59,7 @@ summary(fish)
 Due to the Poisson distirbution being a 1-parameter family, the mean and variance are equal. When this is the case, we say that the data is dispersed with some parameter $\Phi = 1$. If we want to relax the assumption that the mean and variance are equal (which is almost certainly the case) we may employ the Quasi-Poisson distribution which allows $\Phi$ to be estimated from the data. 
 ```{r}
 quasi_fish <- glm(n.events ~ offset(log.time), family = quasipoisson(link = "log"),
-              data  = simple_model)
+              data  = Reshaped)
 summary(quasi_fish)
 quasi_fish$coefficients
 # Coefficients:
@@ -79,15 +69,7 @@ quasi_fish$coefficients
 As we can see, the dispersion parameter here is 2.50. This means that the data is over-dispersed. If we were to find out that adding covariates as predictors to the model doesn't help, we might think that the overdispersion is due to heterogeneity. \\
 Also note that the coefficient estimates are equal (this should ALWAYS be the case). The difference is that inference done here would be adjusted for the adjusted standard error(s). \\
 There is no fully specified likelihood for the quasi-Poisson model. 
-```{r}
-time <-seq (0,8154,0.1)  
 
-values <- predict(fish, list(log.time = time))
-
-plot(simple_model$log.time, simple_model$n.events, xlab = "Offset(Days)", ylab = "Events", pch = 16)
-
-lines(time, exp(values), lwd = 2, col = "blue")
-```
 
 We may also model over-dispersed data such as ours using the negative binomial distribution. The negative binomial may arise from a Poisson$(\lambda)$ distribution where the parameter $(\lambda)$ follows a Gamma distribution. 
 ```{r}
@@ -95,8 +77,7 @@ We may also model over-dispersed data such as ours using the negative binomial d
 library(car)
 library(MASS)
 # need to figure out what is happening with the parameterization in R for neg bin
-
-neg_bin_model <- glm.nb(n.events ~ offset(log.time), link = "log", data  = simple_model)
+neg_bin_model <- glm.nb(n.events ~ offset(log.time), link = "log", data  = Reshaped)
 summary(neg_bin_model)
 ```
 
@@ -119,14 +100,7 @@ log[E(Y_{i}|X_{i})] &= log(\mu_{i}) \\
 
 ### Count Models With Covariates
 The covariates available are : hospital site(2 versions), gender, race, organ, quarter, year, lt2
-```{r}
-# rename the variables so it's clear what we are adding covariates now
-head(Reshaped)
-cov_model <- `colnames<-`(Reshaped,c("id","time.to.death","n.events","dead","hospital","gender","race","organ","quarter","year","lt2","UngrpHospital"))
 
-head(cov_model)
-cov_model$log.time <- log(cov_model$time.to.death)
-```
 
 ```{r}
 # the model we want to use has a poisson component which will link to the survival model via the fraily (random effect) #
@@ -134,12 +108,9 @@ cov_model$log.time <- log(cov_model$time.to.death)
 library(car)
 library(MASS)
 # 
-
-covariate_fish <- glm(n.events ~ offset(log.time) + hospital + gender + race + organ + year + lt2, family = poisson(link = "log"),
-              data  = cov_model)
-
+covariate_fish <- glm(n.events ~ offset(log.time) + gender + race + organ + year + lt2, family = poisson(link = "log"),
+              data  = Reshaped)
 summary(covariate_fish)
-
 ```
 
 We may also model over-dispersed data such as ours using the negative binomial distribution. The negative binomial may arise from a Poisson$(\lambda)$ distribution where the parameter $(\lambda)$ follows a Gamma distribution. 
@@ -148,7 +119,6 @@ We may also model over-dispersed data such as ours using the negative binomial d
 library(car)
 library(MASS)
 # need to figure out what is happening with the parameterization in R for neg bin
-
-cov_neg_bin_model <- glm.nb(n.events ~ offset(log.time) + hospital + gender + race + organ + year + lt2, control = glm.control(maxit=100),link = "log", data  = cov_model)
+cov_neg_bin_model <- glm.nb(n.events ~ offset(log.time) + gender + race + organ + year + lt2, control = glm.control(maxit=100),link = "log", data  = Reshaped)
 summary(cov_neg_bin_model)
 ```

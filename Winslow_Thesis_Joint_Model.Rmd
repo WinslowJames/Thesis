@@ -1,45 +1,29 @@
 ---
-title: "3_31_2020_Winslow_Thesis_Joint_Model"
+title: "Winslow_Thesis_Joint_Model"
 author: "James Winslow"
 date: "4/7/2020"
 output: pdf_document
 ---
 ```{r Import_Data}
+library(dplyr)
+library(reshape)
 source("Winslow_Functions.R")
 
 # this function creates a global object called thesis_data #
 # make sure this isn't problematic since using '<<-' isn't a great habit #
 
 import_data("local")
-head(thesis_data)
 
-```
-
-```{r}
-source("Winslow_Functions.R")
-library(dplyr)
-library(reshape)
 
 # this function creates a global object called Reshaped & cast_thesis #
 # make sure this isn't problematic since using '<<-' isn't a great habit #
 
 clean_data(thesis_data)
-```
-
-
-```{r}
-# Now, we attempt to code the likelihood function and apply to the data
-# let's look at the data to make sure it's what we think it is #
-# head(cast_thesis)
-
-# make a copy of the data for this next bit #
-
-
-# rename the variables so it's clear what we are using them for in the simple
-# model
-simple_model <- `colnames<-`(cast_thesis, c("id","time.to.death","n.events","dead"))
+clean_up(Reshaped)
 
 ```
+
+
 We want to construct a poisson model for the number of infections observed up to a certain time. By imposing an offset, we can interpret the model as a rate instead of a count. This is beneficial to manage the variable start times that subjects may have  
 
 $log(\lambda_{x}) = log(t_{x}) + \beta^{'}_{0} + \beta^{x}_{1}$ \newline
@@ -48,31 +32,18 @@ where $log(t_{x})$ is the offset.
 
 ```{r}
 library(car)
-
 library(tidyr)
 
 ### Relevel / recode for reference categories #
-
-# rename columns #
-Reshaped <- `colnames<-`(Reshaped,c("id","time.to.death","n.events","dead","hospital","gender","race","organ","quarter","year","lt2","UngrpHospital")) 
-
-# Since R will read year as continuous, we rescale to make the variable analagous to years since start time #
-
-Reshaped$year <- Reshaped$year - min(Reshaped$year) 
-
-# Let's rescale hospital number also
-Reshaped$hospital <- as.numeric(Reshaped$hospital)
-table(sort(as.factor(Reshaped$hospital)))
-Reshaped$hospital <- factor(Reshaped$hospital, ordered = is.ordered(x))
 
 # Make 'Heart' the reference category for organ transplant #
 
 Reshaped$organ <- as.factor(Reshaped$organ)
 Reshaped <- within(Reshaped, organ <- relevel(organ, ref = 'Heart'))
 
-# Combine Race into White, Black, and Other #
+# Make the mode (White) the reference category #
 Reshaped$race <- as.factor(Reshaped$race)
-Reshaped$race <- recode(Reshaped$race, " 'White' = 'White' ; 'Black' = 'Black'; else = 'Other' ")
+
 Reshaped <- within(Reshaped, race <- relevel(race, ref = 'White'))
 
 
@@ -175,7 +146,7 @@ z_new <- attr(z,"assign")
 # i have tried maxit=1e3
 #              maxit=1e4
 #             
-	mod1 <- optim(rep(0,27), joint.llik.cov, hessian=TRUE, N=Reshaped$n.events, y=Reshaped$time.to.death, delta=Reshaped$dead, z=z,
+	mod1 <- optim(rep(0,23), joint.llik.cov, hessian=TRUE, N=Reshaped$n.events, y=Reshaped$time.to.death, delta=Reshaped$dead, z=z,
 		control=list(fnscale=-1,trace=0,maxit=1e5))
 
 
@@ -183,17 +154,6 @@ mod1
 # use diag to solve the negative 
 ```
 
-```{r}
-# theta <- rep(0,12)
-# 	regcoef <- head(theta,-1)
-# 	# exponentiate only the last value of the vector theta #
-# 	omega <- exp(tail(theta,1))
-# 
-# 	alphacoef <- head(regcoef,length(regcoef)/2)
-# 	betacoef <- tail(regcoef,length(regcoef)/2)
-# 
-# 	lambda0 <- exp(cbind(1,z) %*% betacoef)
-# 	mu0 <-  exp(cbind(1,z) %*% alphacoef)
-```
+
 
 

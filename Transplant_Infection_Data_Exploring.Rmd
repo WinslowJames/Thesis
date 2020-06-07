@@ -116,6 +116,9 @@ library(tableone)
 Reshaped$bin.event <- ifelse(Reshaped$n.events == 0, 'No RSV/VPI', 'Any RSV/VPI')
 table(Reshaped$bin.event)
 
+Reshaped$year <- recode(Reshaped$year , "0" = "2004" , "1" = "2005", "2" = "2006",
+                        "3" = "2007","4" = "2008","5" = "2009","6" = "2010","7" = "2011", )
+
 # uses library(tableone) #
 ### Table 1 for full/original cohort with none dropped ###
 Table01 <- CreateTableOne(data = Reshaped, vars = c('lt2','gender','race','organ','quarter','year') 
@@ -125,9 +128,7 @@ Table01 <- CreateTableOne(data = Reshaped, vars = c('lt2','gender','race','organ
 FullTable01 <- CreateTableOne(data = Reshaped, vars = c('lt2','gender','race','organ','quarter','year') , strata = 'bin.event', factorVars = c('lt2','gender','race','organ','quarter','year'))
 FinalTable01 <- print(Table01, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
 
-View(FinalTable01)
-
-write.csv(FinalTable01, file = "Table01_Thesis.csv")
+write.csv(FinalTable01, file = "Table01_Thesis.csv", append = TRUE)
 ```
 
 
