@@ -59,50 +59,18 @@ plotlt2 + labs(x = "lt2", y = "Count", fill = 'lt2') + geom_text(stat='count', a
 ```
 # race
 ```{r}
-idrace <- dat[c('id','race')]
+# Look at race distribution# 
 
-Uniqueidrace <- unique(idrace)
+plotrace <- ggplot(Reshaped, aes(x=race,fill = factor(race))) + geom_bar(aes(y = stat(count)))
 
-
-testingstuff <- as.data.frame(table(Uniqueidrace$id))
-
-mult_race_listed <- subset(testingstuff, testingstuff$Freq != 1)
-
-dim(mult_race_listed)
-
-
-
-
-race.first <- idrace[match(unique(idrace$id), idrace$id),]
-dim(race.first)
-# this gets us the right dimension but doesn't match the paper results. So pulling the first occurence of race doesn't work
-
-rawr <- thesis_data[c('id','race')]
-unique(rawr)
-
-subset(thesis_data, thesis_data$id==10000701011)
-subset(Reshaped, Reshaped$id==10000701011)
-
-annoying_dan <- as.data.frame(table(rawr$id)) 
-mult_race <- subset(annoying_dan, annoying_dan$Freq != 1)
-# okay so original data does 
-
-plotlt2 <- ggplot(race.first, aes(x=race,fill = factor(race))) + geom_bar(aes(y = stat(count)))
-
-plotlt2 + labs(x = "race", y = "Count", fill = 'race') + geom_text(stat='count', aes(label=..count..), vjust=-1, size = 3)
+plotrace + labs(x = "race", y = "Count", fill = 'race') + geom_text(stat='count', aes(label=..count..), vjust=-1, size = 3)
 
 ```
 # quarter
 ```{r}
 # Look at lt2 distribution #
-# Do we need to group by id first? #
-idquarter <- dat[c('id','quarter')]
 
-Uniqueidquarter <- unique(idquarter)
-table(Uniqueidquarter$quarter)
-
-
-plotquarter <- ggplot(Uniqueidquarter, aes(x=quarter,fill = factor(quarter))) + geom_bar(aes(y = stat(count)))
+plotquarter <- ggplot(Reshaped, aes(x=quarter,fill = factor(quarter))) + geom_bar(aes(y = stat(count)))
 
 plotquarter + labs(x = "quarter", y = "Count", fill = 'quarter') + geom_text(stat='count', aes(label=..count..), vjust=-1, size = 3)
 ```
@@ -110,126 +78,58 @@ plotquarter + labs(x = "quarter", y = "Count", fill = 'quarter') + geom_text(sta
 # year
 ```{r}
 # Look at lt2 distribution #
-# Do we need to group by id first? #
-idyear <- dat[c('id','year')]
 
-Uniqueidyear <- unique(idyear)
-table(Uniqueidyear$year)
-
-
-plotyear <- ggplot(Uniqueidyear, aes(x=year,fill = factor(year))) + geom_bar(aes(y = stat(count)))
+plotyear <- ggplot(Reshaped, aes(x=year,fill = factor(year))) + geom_bar(aes(y = stat(count)))
 
 plotyear + labs(x = "year", y = "Count", fill = 'year') + geom_text(stat='count', aes(label=..count..), vjust=-1, size = 3)
 ```
 
-# days
-```{r}
-# Look at days distribution #
-# Do we need to group by id first? #
-iddays <- dat[c('id','days')]
 
-Uniqueiddays <- unique(iddays)
-summary(Uniqueiddays$days)
-
-
-```
 # event
 ```{r}
 # Look at event distribution #
-# Do we need to group by id first? #
-idevent <- dat[c('id','event')]
-
-Uniqueidevent <- unique(idevent)
-table(Uniqueidevent$event)
 
 # length(Uniqueidorgan$id)
 
-plotevent <- ggplot(Uniqueidevent, aes(x=event,fill = factor(event))) + geom_bar(aes(y = stat(count)))
+plotevent <- ggplot(Reshaped, aes(x=n.events,fill = factor(n.events))) + geom_bar(aes(y = stat(count)))
 
-plotevent + labs(x = "event", y = "Count", fill = 'event') + geom_text(stat='count', aes(label=..count..), vjust=-1, size = 3)
+plotevent + labs(x = "n.events", y = "Count", fill = 'n.events') + geom_text(stat='count', aes(label=..count..), vjust=-1, size = 3)
 ```
 # death
 ```{r}
 # Look at death distribution #
-# Do we need to group by id first? #
-iddeath <- dat[c('id','death')]
 
-Uniqueiddeath <- unique(iddeath)
-table(Uniqueiddeath$death)
 
-# length(Uniqueidorgan$id)
+plotdeath <- ggplot(Reshaped, aes(x=dead,fill = factor(dead))) + geom_bar(aes(y = stat(count)))
 
-plotdeath <- ggplot(Uniqueiddeath, aes(x=death,fill = factor(death))) + geom_bar(aes(y = stat(count)))
-
-plotdeath + labs(x = "death", y = "Count", fill = 'death') + geom_text(stat='count', aes(label=..count..), vjust=-1, size = 3)
+plotdeath + labs(x = "dead", y = "Count", fill = 'dead') + geom_text(stat='count', aes(label=..count..), vjust=-1, size = 3)
 ```
-# start
-```{r}
-# Look at start distribution #
-# Do we need to group by id first? #
-idstart <- dat[c('id','start')]
-head(idstart)
-Uniqueidstart <- unique(idstart)
 
-summary(Uniqueidstart)
- 
-```
-```{r}
-# we need to combine the variables by unique id#
-library(dplyr)
-dat.events <- 'colnames<-' (dat.events, c("id","events"))
 
-good_tab <- merge(dat.events,Uniqueidlt2, by = "id") 
-  good_tab <- merge(good_tab,Uniqueidgender, by = "id")
-    good_tab <- merge(good_tab,Uniqueidrace, by = "id")
-      good_tab <- merge(good_tab,Uniqueidorgan , by = "id")
-        good_tab <- merge(good_tab,Uniqueidquarter , by = "id")
-          good_tab <- merge(good_tab,Uniqueidyear , by = "id")
-head(good_tab)
-dim(Uniqueidlt2)
-dim(Uniqueidgender)
-dim(Uniqueidrace)
-```
+
 
 
 ```{r}
 library(tableone)
 # Make a table one #
 
-
+Reshaped$bin.event <- ifelse(Reshaped$n.events == 0, 'No RSV/VPI', 'Any RSV/VPI')
+table(Reshaped$bin.event)
 
 # uses library(tableone) #
 ### Table 1 for full/original cohort with none dropped ###
-Table01 <- CreateTableOne(data = dat, vars = c('lt2','gender','race','organ','quarter','year') , strata = 'event', factorVars = c('lt2','gender','race','organ','quarter','year'))
+Table01 <- CreateTableOne(data = Reshaped, vars = c('lt2','gender','race','organ','quarter','year') 
+                          , strata = 'bin.event', factorVars = c('lt2','gender','race','organ','quarter','year'))
 
 #create table with values for overall N #
-FullTable01 <- CreateTableOne(data = dat, vars = c('lt2','gender','race','organ','quarter','year') , strata = 'event', factorVars = c('lt2','gender','race','organ','quarter','year'))
+FullTable01 <- CreateTableOne(data = Reshaped, vars = c('lt2','gender','race','organ','quarter','year') , strata = 'bin.event', factorVars = c('lt2','gender','race','organ','quarter','year'))
 FinalTable01 <- print(Table01, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
+
+View(FinalTable01)
 
 write.csv(FinalTable01, file = "Table01_Thesis.csv")
 ```
 
 
 
-```{r}
-library(xtable)
-lt2_tab <- xtable(as.data.frame(count(Uniqueidlt2$lt2)))
-print(lt2_tab, type = "latex")
-
-gender_tab <-xtable(as.data.frame(Uniqueidgender$gender))
-print(gender_tab, type = "latex")
-
-race_tab <-xtable(as.data.frame(Uniqueidrace$race))
-print(race_tab, type = "latex")
-
-organ_tab <-xtable(as.data.frame(Uniqueidorgan$organ))
-print(organ_tab, type = "latex")
-
-q_tab <-xtable(as.data.frame(Uniqueidquarter$quarter))
-print(q_tab, type = "latex")
-
-y_tab <-xtable(as.data.frame(Uniqueidyear$year))
-print(y_tab , type = "latex")
-
-```
 
