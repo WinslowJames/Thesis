@@ -7,6 +7,7 @@ import_data <- function(x){
   thesis_data <<- thesis_data
 }
 
+
 #############
 
 #############
@@ -42,25 +43,29 @@ melt_thesis <- melt(change_data_one, id = c("MRN","start"))
 summary(melt_thesis$variable)
 cast_thesis <<- cast(melt_thesis, MRN~variable, sum)
 
-# check to see if it looks right #
-# head(cast_thesis)
- 
-# check to see the max number of events #
-# max(cast_thesis$event)
 
-# table(cast_thesis$event)
-
-# write this chunk below better #
-# we are removing the variables that we just used for the reshed data so that we
-# can merge all of the other variables back in 
-
-
-subset_for_covs <- thesis_data[,c(1:9)]
-
-
+subset_for_covs <<- thesis_data[,c(1:9)]
+unique_subset_for_covs <<- unique(subset_for_covs)
 # add max(days) column #
 
 # merge the simple model columns with the covariates #
 # this chunk isn't necesssary for the simple model simulation or likelihood #
-Reshaped <<- merge(x = cast_thesis, y = subset_for_covs, by = "MRN" , all.y = TRUE)
+Reshaped <<- merge(x = cast_thesis, y = unique_subset_for_covs, by = "MRN" , all.y = TRUE)
+}
+
+
+clean_up <- function(Reshaped){
+  # rename columns #
+Reshaped <<- `colnames<-`(Reshaped,c("id","time.to.death","n.events","dead","hospital","gender","race","organ","quarter","year","lt2","UngrpHospital")) 
+
+# Since R will read year as continuous, we rescale to make the variable analagous to years since start time #
+
+Reshaped$year <<- Reshaped$year - min(Reshaped$year) 
+
+
+# Combine Race into White, Black, and Other #
+
+Reshaped$race <<- recode(Reshaped$race , "White" = "White" , "Black" = "Black", "Asian" = "Other",
+                        "Missing" = "Other")
+
 }
