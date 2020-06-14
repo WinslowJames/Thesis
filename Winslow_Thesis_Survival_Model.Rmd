@@ -90,11 +90,19 @@ summary(KM_fit, times = c(1000, 2000))
 
 plot(KM_fit, xlab = "Time to Death (days)", ylab = "Survival Probability", 
     main = "Kaplan-Meier Estimate")
+curve(-pweibull(x,shape=1/2.76,scale=2.76, lower.tail = FALSE, log = TRUE),add=TRUE) 
 
 
-plot(KM_fit, xlab = "Time to Death (days)", ylab = "Survival Probability", 
+
+
+
+# change color of parametric fit so it's more visible
+# remove the confidence intervals 
+# add exponential plot also and have each as a different color
+plot(KM_fit, xlab = "Time to Death (days)", ylab = "Cumulative Hazard", 
     main = "Kaplan-Meier Estimate", fun = "cumhaz")
-
+curve(-pweibull(x,shape=1/2.97,scale=exp(15.1635), lower.tail = FALSE, log = TRUE),add=TRUE, col = "red")
+curve(-pexp(x, rate = 2.97)
 ### 
 
 surv_object <- Surv(time = Reshaped$time.to.death, event = Reshaped$dead)
@@ -111,23 +119,8 @@ summary(survive_mod_exp)
 
 
 summary(survive_mod_weibull)
-weibull_survial_results <- tibble(summary(survive_mod_weibull))
-weibull_survial_results[[1,]]
 
 
-#   survreg's scale  =    1/(rweibull shape)
-#   survreg's intercept = log(rweibull scale)
-# pweibull already takes care of the log-log
-# go back and look at curve function
-# Scale = 2.97 
-# Shape = 1/2.97 
-#       = 0.3367003 
-#              Value Std. Error   z      p
-
-
-# when i use curve, make add=true , lower tail = # 
-# don't need CI when superimposing KM with parametric plots 
-# 
 ```
 
 
@@ -195,23 +188,49 @@ summary(survive_cov_weibull)
 ```
 
 ```{r}
+# check exponential cumulative hazard with empirical survival plot # 
+fitted_exp <- survive_cov_exp$linear.predictors
+resids_exp <- (log(survive_cov_exp$y[, 1]) - fitted_exp) / survive_cov_exp$scale
 
+resid_expKM <- survfit(Surv(resids_exp,dead) ~ 1, data = Reshaped)
+plot(resid_expKM, mark.time = FALSE, xlab = "AFT Residuals" 
+     , ylab = "Survival Probability")
 
-#   survreg's scale  =    1/(rweibull shape)
-#   survreg's intercept = log(rweibull scale)
-# pweibull already takes care of the log-log
-# go back and look at curve function
-# Scale = 2.97 
-# Shape = 1/2.97 
-#       = 0.3367003 
-#              Value Std. Error   z      p
+xx_exp <- seq(min(resids_exp), max(resids_exp), length.out = 35)
+yy_exp <- exp(-exp(xx_exp))
+lines(xx_exp,yy_exp, col = "red", lwd = 2)
+legend("bottomleft", c("KM estimate", "95% CI KM estimate", 
+    "Survival function of Extreme Value distribution"), 
+    lty = c(1,2,1), col = c(1,1,2), bty = "n")
 
+```
+
+```{r}
+
+# check weibull cumulative hazard with empirical survival plot # 
+fitted_weib <- survive_cov_weibull$linear.predictors
+resids_weib <- (log(survive_cov_weibull$y[, 1]) - fitted_weib) / survive_cov_weibull$scale
+
+resid_weibKM <- survfit(Surv(resids_weib,dead) ~ 1, data = Reshaped)
+plot(resid_weibKM, mark.time = FALSE, xlab = "AFT Residuals" 
+     , ylab = "Survival Probability")
+
+xx_weib <- seq(min(resids_weib), max(resids_weib), length.out = 35)
+yy_weib <- exp(-exp(xx_weib))
+lines(xx_weib,yy_weib, col = "red", lwd = 2)
+legend("bottomleft", c("KM estimate", "95% CI KM estimate", 
+    "Survival function of Extreme Value distribution"), 
+    lty = c(1,2,1), col = c(1,1,2), bty = "n")
 
 # when i use curve, make add=true , lower tail = # 
 # don't need CI when superimposing KM with parametric plots 
-# 
-curve(pweibull(x,shape=1/2.76,scale=2.76),0,80,ylab="Cumulative Proportion")
+#
+```
+
+```{r}
+curve(pweibull(x,shape=1/2.76,scale=2.76),0,80,ylab="Cumulative Proportion") 
 curve(1-pweibull(x,shape=1/2.76,scale=2.76),0,80,ylab="Survival Proportion")
+
 ```
 
 ```{r}
@@ -239,6 +258,7 @@ summary(exp_no_year)
 
 
 summary(weibull_no_year)
+
 
 
 # pull off the design matrix x
