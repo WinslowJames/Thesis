@@ -68,6 +68,23 @@ Here, we present the formulation of a simple survival model using both an expone
 
 
 
+
+```{r}
+t <- seq(from = 1, to = 100, by = 1)
+lambda = 0.25
+ht <- lambda
+Ht <- lambda * t
+St <- exp(-lambda * t)
+par(mfrow = c(2,3), pty = "s")
+plot(t, rep(ht, times = length(t)), ylim = c(0, 1), lwd = 2, type = "s", xlab
+= "Time", ylab = "h(t)")
+plot(t, Ht, ylim = c(0, 25), lwd = 2, type = "s", xlab = "Time", ylab =
+"H(t)")
+plot(t, St, ylim = c(0, 1), lwd = 2, type = "s", xlab = "Time", ylab = "S(t)")
+plot(t, 1- St, ylim = c(0, 1), lwd = 2, type = "s", xlab = "Time", ylab = "S(t)", fun = "cumhaz")
+
+```
+
 ```{r}
 # now do the survival element #
 # we want to do a simpler model with the hazard being exponential #
@@ -88,37 +105,36 @@ KM_fit <- survfit(Surv(time = Reshaped$time.to.death, event = Reshaped$dead)~1, 
 
 summary(KM_fit, times = c(1000, 2000))
 
-plot(KM_fit, xlab = "Time to Death (days)", ylab = "Survival Probability", 
-    main = "Kaplan-Meier Estimate")
-curve(-pweibull(x,shape=1/2.76,scale=2.76, lower.tail = FALSE, log = TRUE),add=TRUE) 
-
-
-
+plot(KM_fit,  ylim = c(0, 1), xlab = "Time to Death (days)", ylab = "Cumulative Hazard", 
+    main = "Kaplan-Meier Estimate", fun = "cumhaz", conf.int = FALSE)
 
 
 # change color of parametric fit so it's more visible
 # remove the confidence intervals 
 # add exponential plot also and have each as a different color
 plot(KM_fit, xlab = "Time to Death (days)", ylab = "Cumulative Hazard", 
-    main = "Kaplan-Meier Estimate", fun = "cumhaz")
-curve(-pweibull(x,shape=1/2.97,scale=exp(15.1635), lower.tail = FALSE, log = TRUE),add=TRUE, col = "red")
-curve(-pexp(x, rate = 2.97)
+    main = "Kaplan-Meier Estimate", fun = "cumhaz", conf.int = FALSE)
+curve(-pweibull(x, shape=1/2.97, scale=exp(15.1635), lower.tail = FALSE, log = TRUE),add=TRUE, col = "red")
+curve(-pweibull(x, shape = 1/1, scale = exp(10.116), lower.tail = FALSE, log = TRUE), add = TRUE, col = "blue" )
 ### 
 
 surv_object <- Surv(time = Reshaped$time.to.death, event = Reshaped$dead)
 
 
-survive_mod_exp <- survreg(Surv(time.to.death,dead) ~ 1, data = Reshaped, dist="exponential", x = TRUE)
+survive_mod_exp <- survreg(Surv(time.to.death,dead) ~ 1, data = Reshaped, dist="weibull", scale=1, x = TRUE) 
 
-survive_mod_weibull <- survreg(Surv(time.to.death,dead) ~ 1, data = Reshaped, dist="weibull", x = TRUE)
-
-
-
-summary(survive_mod_exp)
+survive_mod_weibull <- survreg(Surv(time.to.death,dead) ~ 1, data = Reshaped, dist="weibull", x = TRUE) 
 
 
 
-summary(survive_mod_weibull)
+summary(survive_mod_exp) 
+# To get MLE we take negative of exponential of parameter estimate
+exp((summary(survive_mod_exp)$table[,1])) 
+
+
+
+
+summary(survive_mod_weibull) 
 
 
 ```
@@ -173,7 +189,8 @@ survive_cov_weibull <- survreg(Surv(time.to.death,dead) ~ gender + race + organ 
 
 
 summary(survive_cov_exp)
-
+# To get the MLEs we take the negative of the exponential
+exp(-(summary(survive_cov_exp)$table[,1]))
 
 
 summary(survive_cov_weibull)
@@ -187,85 +204,6 @@ summary(survive_cov_weibull)
 
 ```
 
-```{r}
-# check exponential cumulative hazard with empirical survival plot # 
-fitted_exp <- survive_cov_exp$linear.predictors
-resids_exp <- (log(survive_cov_exp$y[, 1]) - fitted_exp) / survive_cov_exp$scale
-
-resid_expKM <- survfit(Surv(resids_exp,dead) ~ 1, data = Reshaped)
-plot(resid_expKM, mark.time = FALSE, xlab = "AFT Residuals" 
-     , ylab = "Survival Probability")
-
-xx_exp <- seq(min(resids_exp), max(resids_exp), length.out = 35)
-yy_exp <- exp(-exp(xx_exp))
-lines(xx_exp,yy_exp, col = "red", lwd = 2)
-legend("bottomleft", c("KM estimate", "95% CI KM estimate", 
-    "Survival function of Extreme Value distribution"), 
-    lty = c(1,2,1), col = c(1,1,2), bty = "n")
-
-```
-
-```{r}
-
-# check weibull cumulative hazard with empirical survival plot # 
-fitted_weib <- survive_cov_weibull$linear.predictors
-resids_weib <- (log(survive_cov_weibull$y[, 1]) - fitted_weib) / survive_cov_weibull$scale
-
-resid_weibKM <- survfit(Surv(resids_weib,dead) ~ 1, data = Reshaped)
-plot(resid_weibKM, mark.time = FALSE, xlab = "AFT Residuals" 
-     , ylab = "Survival Probability")
-
-xx_weib <- seq(min(resids_weib), max(resids_weib), length.out = 35)
-yy_weib <- exp(-exp(xx_weib))
-lines(xx_weib,yy_weib, col = "red", lwd = 2)
-legend("bottomleft", c("KM estimate", "95% CI KM estimate", 
-    "Survival function of Extreme Value distribution"), 
-    lty = c(1,2,1), col = c(1,1,2), bty = "n")
-
-# when i use curve, make add=true , lower tail = # 
-# don't need CI when superimposing KM with parametric plots 
-#
-```
-
-```{r}
-curve(pweibull(x,shape=1/2.76,scale=2.76),0,80,ylab="Cumulative Proportion") 
-curve(1-pweibull(x,shape=1/2.76,scale=2.76),0,80,ylab="Survival Proportion")
-
-```
-
-```{r}
-### This chunk removed year but is otherwise identical to the earlier chunk #
-# Load required packages
-library(rms)
-library(survival)
-library(survminer)
-library(dplyr)
-
-options(scipen = 99)
 
 
-surv_object <- Surv(time = Reshaped$time.to.death, event = Reshaped$dead)
-
-# remember to remove hospital from the model as a continuous parameter  #
-exp_no_year <- survreg(Surv(time.to.death,dead) ~ gender + race + organ + lt2 , data = Reshaped, dist="exponential", x = TRUE)
-
-weibull_no_year <- survreg(Surv(time.to.death,dead) ~ gender + race + organ + lt2, data = Reshaped, dist="weibull", x = TRUE)
-
-
-
-summary(exp_no_year)
-
-
-
-summary(weibull_no_year)
-
-
-
-# pull off the design matrix x
-# model.matrix or model.frame
-
-
-
-
-```
 
